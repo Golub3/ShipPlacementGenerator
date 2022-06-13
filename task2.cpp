@@ -1,6 +1,8 @@
 #include <iostream>
 #include <windows.h>
 #include <vector>
+#include <thread>
+#include <mutex>
 using namespace std;
 
 enum class Color { Black, Red, Brown, White };
@@ -179,59 +181,60 @@ vector<Ship> find_all_positions(int deck) {
 }
 
 
-void draw_ship(Ship ship) {
+void draw_ship(int (&copy_field)[HEIGHT][WIDTH], Ship ship) {
 	if (ship.horizontal == true) {
 		for (int i = ship.x; i < ship.x + ship.deck; i++) {
-			main_field[ship.y][i] = 4;
+			copy_field[ship.y][i] = 4;
 		}
 	}
 	else {
 		for (int i = ship.y; i < ship.y + ship.deck; i++) {
-			main_field[i][ship.x] = 4;
+			copy_field[i][ship.x] = 4;
 		}
 	}
-	//draw_field(main_field, 10);
 }
 
 
-void delete_ship(Ship ship) {
+void delete_ship(int(&copy_field)[HEIGHT][WIDTH], Ship ship) {
 	if (ship.horizontal == true) {
 		for (int i = ship.x; i < ship.x + ship.deck; i++) {
-			main_field[ship.y][i] = 0;
+			copy_field[ship.y][i] = 0;
 		}
 	}
 	else {
 		for (int i = ship.y; i < ship.y + ship.deck; i++) {
-			main_field[i][ship.x] = 0;
+			copy_field[i][ship.x] = 0;
 		}
 	}
-	//draw_field(main_field, 10);
 }
 
 
-int change_indexes(int pos, vector<int> &ship_indexes, vector<vector<Ship>> vectors) {
-	static int i;
-	i = pos;
-	if (ship_indexes[pos] < vectors[pos].size() - 1) ship_indexes[pos]++;
-	else {
-		ship_indexes[pos] = 0;
-		i--;
-		if (pos > 0) {
-			delete_ship(vectors[pos - 1][ship_indexes[pos - 1]]);
-			change_indexes(pos - 1, ship_indexes, vectors);
+int change_indexes(int(&copy_field)[HEIGHT][WIDTH], int pos, vector<int> &ship_indexes, vector<vector<Ship>> vectors) {
+	int i = pos;
+	while (true) {
+		if (ship_indexes[i] < vectors[i].size() - 1) {
+			ship_indexes[i]++;
+			break;
 		}
-		else return -1;
+		else {
+			ship_indexes[i] = 0;
+			if (i > 0) {
+				delete_ship(copy_field, vectors[i - 1][ship_indexes[i - 1]]);
+				i--;
+			}
+			else return -1;
+		}
 	}
 	return i;
 }
 
 
-boolean ship_can_be_placed(Ship ship) {
+boolean ship_can_be_placed(int(&copy_field)[HEIGHT][WIDTH], Ship ship) {
 	if (ship.horizontal == true) {
 		for (int i = 0; i < ship.deck + 2; i++) {
 			for (int j = 0; j < 3; j++) {
-				if ((j == 1 && i > 0 && i < ship.deck + 1 && main_field[j + ship.y - 1][i + ship.x - 1] != 0) ||
-					((0 <= i + ship.x - 1 && i + ship.x - 1 < WIDTH && 0 <= j + ship.y - 1 && j + ship.y - 1 < HEIGHT) && main_field[j + ship.y - 1][i + ship.x - 1] >= 4)) {
+				if ((j == 1 && i > 0 && i < ship.deck + 1 && copy_field[j + ship.y - 1][i + ship.x - 1] != 0) ||
+					((0 <= i + ship.x - 1 && i + ship.x - 1 < WIDTH && 0 <= j + ship.y - 1 && j + ship.y - 1 < HEIGHT) && copy_field[j + ship.y - 1][i + ship.x - 1] >= 4)) {
 					return false;
 				}
 			}
@@ -240,8 +243,8 @@ boolean ship_can_be_placed(Ship ship) {
 	else {
 		for (int i = 0; i < 3; i++) {
 			for (int j = 0; j < ship.deck + 2; j++) {
-				if ((i == 1 && j > 0 && j < ship.deck + 1 && main_field[j + ship.y - 1][i + ship.x - 1] != 0) ||
-					((0 <= i + ship.x - 1 && i + ship.x - 1 < WIDTH && 0 <= j + ship.y - 1 && j + ship.y - 1 < HEIGHT) && main_field[j + ship.y - 1][i + ship.x - 1] >= 4)) {
+				if ((i == 1 && j > 0 && j < ship.deck + 1 && copy_field[j + ship.y - 1][i + ship.x - 1] != 0) ||
+					((0 <= i + ship.x - 1 && i + ship.x - 1 < WIDTH && 0 <= j + ship.y - 1 && j + ship.y - 1 < HEIGHT) && copy_field[j + ship.y - 1][i + ship.x - 1] >= 4)) {
 					return false;
 				}
 			}
@@ -251,7 +254,7 @@ boolean ship_can_be_placed(Ship ship) {
 }
 
 
-boolean is_possible_to_place_one_deck_ships() {
+boolean is_possible_to_place_one_deck_ships(int(&copy_field)[HEIGHT][WIDTH]) {
 	vector<Ship> arr;
 	int count = 0, num = 0;
 	boolean check = true;
@@ -260,15 +263,14 @@ boolean is_possible_to_place_one_deck_ships() {
 			for (int y = 0; y < HEIGHT; y++) {
 				for (int i = 0; i < 3 && check; i++) {
 					for (int j = 0; j < 3 && check; j++) {
-						if ((j == 1 && i == 1 && main_field[y][x] != 0) ||
-							((0 <= i + x - 1 && i + x - 1 < WIDTH && 0 <= j + y - 1 && j + y - 1 < HEIGHT) && main_field[j + y - 1][i + x - 1] >= 4)) {
+						if ((j == 1 && i == 1 && copy_field[y][x] != 0) ||
+							((0 <= i + x - 1 && i + x - 1 < WIDTH && 0 <= j + y - 1 && j + y - 1 < HEIGHT) && copy_field[j + y - 1][i + x - 1] >= 4)) {
 							check = false;
 						}
 					}
 				}
 				if (check) {
-					main_field[y][x] = 4;
-					//draw_field(main_field, 10);
+					copy_field[y][x] = 4;
 					num++;
 					count++;
 					arr.push_back(Ship(1, x, y, false));
@@ -282,12 +284,66 @@ boolean is_possible_to_place_one_deck_ships() {
 	if (count == 4) return true;
 	else {
 		for (int i = 0; i < count; i++) {
-			main_field[arr[i].y][arr[i].x] = 0;
-			//draw_field(main_field, 10);
+			copy_field[arr[i].y][arr[i].x] = 0;
 		}
 		arr.clear();
 		return false;
 	}
+}
+
+
+boolean thread_generate(int thread_num, Ship ship, vector<Ship> vect3, vector<Ship> vect2, vector<int> ship_sizes, vector<int> ship_indexes) {
+	boolean ship_is_not_placed = true, all_ships_are_not_placed = true;
+	vector<Ship> vect4 = { ship };
+	vector<vector<Ship>> vectors = { vect4, vect3, vect3, vect2, vect2, vect2 };;
+	int i = 0;
+	int copy_field[HEIGHT][WIDTH] = {0};
+
+	for (int x = 0; x < HEIGHT; x++)
+	{
+		for (int y = 0; y < WIDTH; y++)
+		{
+			copy_field[x][y] = main_field[x][y];
+		}
+	}
+
+	do {
+		for (; i < ship_indexes.size(); i++) {
+			if (i != 0 && ship_sizes[i] == ship_sizes[i - 1] && ship_indexes[i] < ship_indexes[i - 1]) {
+				ship_indexes[i] = ship_indexes[i - 1];
+				i = change_indexes(copy_field, i, ship_indexes, vectors);
+			}
+
+			while (ship_is_not_placed) {
+				if (ship_can_be_placed(copy_field, vectors[i][ship_indexes[i]])) {
+					draw_ship(copy_field, vectors[i][ship_indexes[i]]);
+					ship_is_not_placed = false;
+				}
+				else {
+					i = change_indexes(copy_field, i, ship_indexes, vectors);
+					if (i == -1) return false;
+				}
+			}
+			ship_is_not_placed = true;
+		}
+
+		if (is_possible_to_place_one_deck_ships(copy_field)) {
+			all_ships_are_not_placed = false;
+		}
+		else {
+			delete_ship(copy_field, vectors[i - 1][ship_indexes[i - 1]]);
+			i = change_indexes(copy_field, ship_indexes.size() - 1, ship_indexes, vectors);
+		}
+	} while (all_ships_are_not_placed);
+	
+	for (int x = 0; x < HEIGHT; x++)
+	{
+		for (int y = 0; y < WIDTH; y++)
+		{
+			main_field[x][y] = copy_field[x][y];
+		}
+	}
+	return true;
 }
 
 
@@ -296,47 +352,18 @@ boolean generate() {
 	if (vect4.size() == 0) return false;
 	vector<Ship> vect3 = find_all_positions(3);
 	vector<Ship> vect2 = find_all_positions(2);
-	vector<vector<Ship>> vectors = { vect4, vect3, vect3, vect2, vect2, vect2 };;
 	vector<int> ship_sizes = { 4, 3, 3, 2, 2, 2 };;
 	vector<int> ship_indexes = { 0, 0, 1, 0, 1, 2 };;
-	boolean ship_is_not_placed = true, all_ships_are_not_placed = true;
-	int i = 0;
+	vector<thread> threads;
 
-	do {
-		for (; i < ship_indexes.size(); i++) {
-			if (i != 0 && ship_sizes[i] == ship_sizes[i - 1] && ship_indexes[i] < ship_indexes[i - 1]) {
-				ship_indexes[i] = ship_indexes[i - 1];
-				i = change_indexes(i, ship_indexes, vectors);
-			}
+	for (int thread_num = 1; thread_num <= vect4.size(); thread_num++) {
+		threads.push_back(thread(thread_generate, thread_num, vect4[thread_num - 1], vect3, vect2, ship_sizes, ship_indexes));
+	}
 
-			while (ship_is_not_placed) {
-				if (ship_can_be_placed(vectors[i][ship_indexes[i]])) {
-					draw_ship(vectors[i][ship_indexes[i]]);
-					ship_is_not_placed = false;
-				}
-				else {
-					i = change_indexes(i, ship_indexes, vectors);
-					if (i == -1) return false;
-				}
-			}
-			ship_is_not_placed = true;
-		}
+	for (int i = 0; i < threads.size(); i++) {
+		threads[i].join();
+	}
 
-		if (is_possible_to_place_one_deck_ships()) {
-			all_ships_are_not_placed = false;
-		} 
-		else {
-			delete_ship(vectors[i - 1][ship_indexes[i - 1]]);
-			i = change_indexes(ship_indexes.size() - 1, ship_indexes, vectors);
-		}
-	} while (all_ships_are_not_placed);
-
-	vect4.clear();
-	vect3.clear();
-	vect2.clear();
-	vectors.clear();
-	ship_sizes.clear();
-	ship_indexes.clear();
 	return true;
 }
 
